@@ -1,58 +1,60 @@
-AI Resume Analyzer
-An intelligent web application that uses a large language model to analyze and extract key information from a PDF resume. The application securely stores the extracted skills and projects in a user-specific cloud database, demonstrating a full-stack approach to a practical data-processing problem.
+# 📄 AI Resume Analyzer  
 
-Features
-PDF Parsing: Extracts raw text from any PDF resume.
+An intelligent web application that uses a **Large Language Model (LLM)** to analyze and extract key information from PDF resumes.  
+This project demonstrates a **full-stack approach** to solving a practical data-processing problem by securely storing extracted **skills** and **projects** in a user-specific cloud database.  
 
-AI-Powered Extraction: Utilizes a large language model to intelligently identify and structure skills and projects from unstructured text.
+---
 
-Secure Cloud Storage: Persists user-specific data in a secure Firebase Firestore database.
+## 🚀 Features  
 
-User-Specific Profiles: Automatically creates and manages a private profile for each user to save their resume data.
+- **PDF Parsing** – Extracts raw text from any PDF resume on the client side.  
+- **AI-Powered Extraction** – Utilizes **Google’s Gemini API** to intelligently identify and structure skills and projects.  
+- **Secure Cloud Storage** – Persists user data in **Firebase Firestore** with strict security rules.  
+- **User-Specific Profiles** – Each user automatically gets a private profile to store resume data.  
+- **Persistent Data** – Users can revisit the app anytime to view previously saved results.  
+- **Responsive UI** – Clean, professional design built with **Tailwind CSS**, optimized for desktop and mobile.  
 
-Persistent Data: Users can revisit the application at any time to view their previously saved data.
+---
 
-Professional and Responsive UI: The application's clean design is built with Tailwind CSS and works flawlessly on both desktop and mobile devices.
+## 🛠️ Technologies Used  
 
-Technologies Used
-Frontend: HTML, JavaScript, and Tailwind CSS for a modern, responsive user interface.
+- **Frontend:** HTML, JavaScript, Tailwind CSS  
+- **AI Model:** Google Gemini API  
+- **Database:** Firebase Firestore (secure, scalable, real-time)  
+- **PDF Processing:** [PDF.js](https://mozilla.github.io/pdf.js/)  
 
-AI Model: Google's Gemini API for powerful text extraction and data structuring.
+---
 
-Database: Firebase Firestore for secure, scalable, and real-time data storage.
+## 📂 Project Setup  
 
-PDF Processing: PDF.js library for client-side PDF text extraction.
-
-How to Run
-Clone the repository:
-
-git clone [https://github.com/mehrtam/ai-resume-analyzer.git](https://github.com/mehrtam/ai-resume-analyzer.git)
-
-Navigate to the project directory:
-
+### 1. Clone the repository  
+```bash
+git clone https://github.com/mehrtam/ai-resume-analyzer.git
+2. Navigate to the project folder
+bash
+Copy code
 cd ai-resume-analyzer
+3. Run the application
+Simply open resume_extractor.html in your web browser.
+The app is self-contained in a single HTML file — no local server required.
 
-Open the file:
-Open resume_extractor.html directly in your preferred web browser. The application is entirely self-contained within this single file, making it easy to run. No local server is required.
+⚙️ How It Works
+File Upload – User uploads a PDF resume via the UI.
 
-How it Works
-The application follows a simple, yet powerful, workflow:
+Text Extraction – PDF.js extracts raw text from the PDF.
 
-File Upload: A user uploads a PDF file via the clean UI.
+AI Analysis – Text is sent to Gemini API with a custom prompt to output structured JSON (skills & projects).
 
-Text Extraction: The JavaScript and PDF.js libraries work together to extract all the text content from the PDF on the client-side.
+Data Persistence – The JSON data is securely saved in Firestore, scoped by a unique user ID.
 
-AI Analysis: The extracted text is sent to the Gemini API with a specific prompt to identify and format skills and projects into a structured JSON object.
+Data Display – Results are displayed instantly and auto-loaded on future visits.
 
-Data Persistence: The returned JSON data is saved to a secure document in a Firestore database. A unique user ID is used to ensure that data remains private to each user.
+🔒 Data Security
+All data is securely stored in Firebase Firestore under a user-specific path:
 
-Data Display: The extracted data is then displayed in the text areas, and is automatically loaded from Firestore on subsequent visits.
-
-Where is the data saved?
-Data is saved to a secure, private document in the Firebase Firestore cloud database. It is stored within a collection that is uniquely identified by the user's ID, ensuring that only the user who uploaded the resume can access their data.
-
-The full path to the data is:
-
+bash
+Copy code
 artifacts/{your_app_id}/users/{your_user_id}/resumes
+Each resume is tied to a unique user ID, preventing unauthorized access.
 
-This structure prevents unauthorized access and showcases a strong understanding of database security principles.
+This structure enforces privacy and reflects strong database security principles.
