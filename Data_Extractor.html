@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Extractor</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 antialiased min-h-screen flex items-center justify-center p-4 md:p-6">
+
+    <div class="w-full max-w-6xl bg-white rounded-2xl shadow-2xl p-6 md:p-10 space-y-8 flex flex-col lg:flex-row lg:space-x-12">
+
+        <!-- Left Panel: Upload and Controls -->
+        <div class="flex-1 space-y-8">
+            <h1 class="text-3xl md:text-4xl font-extrabold text-center text-gray-800 tracking-tight">AI Resume Analyzer</h1>
+            <p class="text-center text-gray-500 font-medium leading-relaxed">
+                Effortlessly extract key information from your resume and save it to your profile.
+            </p>
+
+            <div class="flex flex-col items-center space-y-6">
+                <label for="pdf-upload" class="flex flex-col items-center justify-center w-full h-48 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer hover:bg-gray-50 transition-colors p-6">
+                    <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-4-4v-1a4 4 0 014-4h14a4 4 0 014 4v1a4 4 0 01-4 4H7zM12 4v16m-4-8h8"></path></svg>
+                    <span class="mt-4 text-sm md:text-base text-gray-600 font-semibold text-center">Drag and drop your PDF here, or click to browse</span>
+                    <input type="file" id="pdf-upload" accept=".pdf" class="hidden">
+                </label>
+            </div>
+
+            <div class="flex flex-col items-center space-y-4">
+                <button id="extract-button" class="w-full px-8 py-4 bg-blue-600 text-white font-bold text-lg rounded-xl hover:bg-blue-700 transition-colors focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                    Analyze Resume
+                </button>
+                <div class="flex flex-col md:flex-row w-full space-y-4 md:space-y-0 md:space-x-4">
+                    <button id="save-button" class="flex-1 px-8 py-4 bg-emerald-600 text-white font-bold text-lg rounded-xl hover:bg-emerald-700 transition-colors focus:outline-none focus:ring-4 focus:ring-emerald-500 focus:ring-offset-2 hidden">
+                        Save to Profile
+                    </button>
+                    <button id="delete-button" class="flex-1 px-8 py-4 bg-red-600 text-white font-bold text-lg rounded-xl hover:bg-red-700 transition-colors focus:outline-none focus:ring-4 focus:ring-red-500 focus:ring-offset-2 hidden">
+                        Delete Saved Data
+                    </button>
+                </div>
+            </div>
+
+            <!-- Status and User Info -->
+            <div class="text-center text-sm text-gray-500 mt-4 space-y-2">
+                <div id="status-message" class="font-medium text-gray-600">Awaiting file upload...</div>
+                <div id="user-id-display" class="text-xs text-gray-400"></div>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div id="loading-spinner" class="flex justify-center items-center hidden">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+
+            <!-- Error Message Box -->
+            <div id="error-message-box" class="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-xl relative hidden" role="alert">
+                <strong class="font-bold">Error!</strong>
+                <span class="block sm:inline ml-2" id="error-message"></span>
+            </div>
+
+        </div>
+
+        <!-- Right Panel: Extracted Data -->
+        <div class="flex-1 space-y-6">
+            <div>
+                <label for="skills-output" class="block text-sm font-semibold text-gray-700 mb-2">Extracted Skills</label>
+                <textarea id="skills-output" rows="10" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 resize-none p-4 text-sm" placeholder="Your skills will appear here..."></textarea>
+            </div>
+            <div>
+                <label for="projects-output" class="block text-sm font-semibold text-gray-700 mb-2">Extracted Projects</label>
+                <textarea id="projects-output" rows="10" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 resize-none p-4 text-sm" placeholder="Your projects will be listed here..."></textarea>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, collection, addDoc, onSnapshot, query, where, getDocs, Timestamp, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
+        
+        // PDF.js CDN
+        const PDFJS_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.11.338/build/pdf.min.js';
+        const PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.11.338/build/pdf.worker.min.js';
+
+        const uploadInput = document.getElementById('pdf-upload');
+        const extractButton = document.getElementById('extract-button');
+        const saveButton = document.getElementById('save-button');
+        const deleteButton = document.getElementById('delete-button'); 
+        const statusMessage = document.getElementById('status-message');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const skillsOutput = document.getElementById('skills-output');
+        const projectsOutput = document.getElementById('projects-output');
+        const errorMessageDiv = document.getElementById('error-message-box');
+        const errorMessageSpan = document.getElementById('error-message');
+        const userIdDisplay = document.getElementById('user-id-display');
+
+        let db;
+        let auth;
+        let userId;
+        let savedDocId = null; 
+
+        // Global variables for Firebase setup
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        getAnalytics(app);
+
+        // Firebase Auth State Listener
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                userIdDisplay.textContent = `User ID: ${userId}`;
+                console.log('Firebase initialized. User authenticated.');
+                fetchAndDisplayData();
+            } else {
+                try {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (error) {
+                    console.error('Firebase authentication failed:', error);
+                    showError('Failed to authenticate with Firebase.');
+                }
+            }
+        });
+
+        function showError(message) {
+            errorMessageSpan.textContent = message;
+            errorMessageDiv.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorMessageDiv.classList.add('hidden');
+        }
+
+        function showStatus(message, isError = false) {
+            hideError();
+            if (isError) {
+                showError(message);
+            } else {
+                statusMessage.textContent = message;
+            }
+        }
+
+        function setLoading(isLoading) {
+            if (isLoading) {
+                loadingSpinner.classList.remove('hidden');
+                extractButton.disabled = true;
+                extractButton.classList.add('opacity-50', 'cursor-not-allowed');
+                saveButton.classList.add('hidden');
+                deleteButton.classList.add('hidden');
+            } else {
+                loadingSpinner.classList.add('hidden');
+                if (uploadInput.files.length > 0) {
+                    extractButton.disabled = false;
+                    extractButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }
+        }
+
+        function fetchAndDisplayData() {
+            if (!userId) {
+                console.log('User ID not available to fetch data.');
+                return;
+            }
+
+            const resumesColRef = collection(db, `artifacts/${appId}/users/${userId}/resumes`);
+            const q = query(resumesColRef);
+
+            onSnapshot(q, (snapshot) => {
+                if (snapshot.empty) {
+                    showStatus('No saved data found.');
+                    skillsOutput.value = '';
+                    projectsOutput.value = '';
+                    saveButton.classList.add('hidden');
+                    deleteButton.classList.add('hidden');
+                    savedDocId = null;
+                    return;
+                }
+                
+                const doc = snapshot.docs[0];
+                const data = doc.data();
+                
+                if (data) {
+                    try {
+                        const parsedData = JSON.parse(data.extractedData);
+                        skillsOutput.value = parsedData.skills.map(s => `- ${s}`).join('\n');
+                        projectsOutput.value = parsedData.projects.map(p => `- ${p.title}: ${p.description}`).join('\n');
+                        showStatus('Data loaded from database.');
+                        saveButton.classList.remove('hidden');
+                        deleteButton.classList.remove('hidden');
+                        savedDocId = doc.id;
+                    } catch (e) {
+                        showError('Failed to parse data from database.');
+                        console.error('Parsing error:', e);
+                    }
+                }
+            }, (error) => {
+                console.error("Error fetching documents: ", error);
+                showError("Failed to load saved data.");
+            });
+        }
+
+        uploadInput.addEventListener('change', () => {
+            if (uploadInput.files.length > 0) {
+                extractButton.disabled = false;
+                extractButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                showStatus(`File selected: ${uploadInput.files[0].name}`);
+                skillsOutput.value = '';
+                projectsOutput.value = '';
+            }
+        });
+
+        extractButton.addEventListener('click', async () => {
+            const file = uploadInput.files[0];
+            if (!file) {
+                showError('Please select a PDF file first.');
+                return;
+            }
+
+            setLoading(true);
+            showStatus('Extracting text from PDF...');
+            
+            try {
+                if (!window.pdfjsLib) {
+                    throw new Error("PDF.js library is not loaded. Please try again.");
+                }
+                const reader = new FileReader();
+                reader.readAsArrayBuffer(file);
+                
+                reader.onload = async function(event) {
+                    const pdfData = new Uint8Array(event.target.result);
+                    const pdf = await window.pdfjsLib.getDocument({ data: pdfData }).promise;
+                    let fullText = '';
+                    
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        fullText += textContent.items.map(item => item.str).join(' ');
+                    }
+
+                    showStatus('Sending text to AI for analysis...');
+
+                    const prompt = `Extract the "Skills" and "Projects" sections from the following resume text. For skills, list them as an array of strings. For projects, list them as an array of objects, each with a "title" and a "description" property. Here is the resume text:\n\n${fullText}`;
+
+                    const payload = {
+                        contents: [ { role: "user", parts: [ { text: prompt } ] } ],
+                        generationConfig: {
+                            responseMimeType: "application/json",
+                            responseSchema: {
+                                type: "OBJECT",
+                                properties: {
+                                    skills: { type: "ARRAY", items: { type: "STRING" } },
+                                    projects: {
+                                        type: "ARRAY",
+                                        items: {
+                                            type: "OBJECT",
+                                            properties: {
+                                                title: { type: "STRING" },
+                                                description: { type: "STRING" }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    };
+                    
+                    const apiKey = "";
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                    
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(`API Error: ${response.status} - ${errorData.error.message}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    if (!result || !result.candidates || result.candidates.length === 0) {
+                        throw new Error("The AI response was empty or invalid.");
+                    }
+                    
+                    let extractedData = null;
+
+                    const contentParts = result.candidates[0].content.parts;
+                    const jsonPart = contentParts.find(part => part.data && part.data.json);
+                    
+                    if (jsonPart) {
+                        extractedData = jsonPart.data.json;
+                    } else {
+                        const textPart = contentParts.find(part => part.text);
+                        if (textPart) {
+                            try {
+                                extractedData = JSON.parse(textPart.text);
+                            } catch (e) {
+                                console.error("Failed to parse text as JSON:", e);
+                            }
+                        }
+                    }
+
+                    if (!extractedData) {
+                        throw new Error("AI response did not contain the expected structured data.");
+                    }
+
+                    console.log("Extracted AI data:", extractedData);
+
+                    skillsOutput.value = extractedData.skills.map(s => `- ${s}`).join('\n');
+                    projectsOutput.value = extractedData.projects.map(p => `- ${p.title}: ${p.description}`).join('\n');
+                    
+                    saveButton.classList.remove('hidden');
+                    deleteButton.classList.add('hidden'); 
+                    setLoading(false);
+                    showStatus('Extraction complete! Review and save your data.');
+                    
+                };
+                
+            } catch (error) {
+                console.error("Extraction error:", error);
+                setLoading(false);
+                showError(`Failed to extract data. Please try another file. Error: ${error.message}`);
+            }
+        });
+
+        saveButton.addEventListener('click', async () => {
+            const skills = skillsOutput.value.split('\n').filter(s => s.trim() !== '').map(s => s.replace(/^- /, '').trim());
+            const projects = projectsOutput.value.split('\n').filter(p => p.trim() !== '').map(p => {
+                const [title, ...descParts] = p.replace(/^- /, '').split(':');
+                return { title: title.trim(), description: descParts.join(':').trim() };
+            });
+
+            const dataToSave = {
+                extractedData: JSON.stringify({ skills, projects }),
+                timestamp: Timestamp.now()
+            };
+
+            setLoading(true);
+            showStatus('Saving data...');
+
+            try {
+                const resumesColRef = collection(db, `artifacts/${appId}/users/${userId}/resumes`);
+                
+                const q = query(resumesColRef);
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
+                    const docToUpdate = querySnapshot.docs[0];
+                    await setDoc(doc(db, `artifacts/${appId}/users/${userId}/resumes`, docToUpdate.id), dataToSave);
+                    savedDocId = docToUpdate.id;
+                } else {
+                    const newDocRef = await addDoc(resumesColRef, dataToSave);
+                    savedDocId = newDocRef.id;
+                }
+                
+                setLoading(false);
+                showStatus('Data saved successfully!');
+                deleteButton.classList.remove('hidden'); 
+            } catch (e) {
+                console.error("Error saving document: ", e);
+                setLoading(false);
+                showError("Failed to save data. Check the console for more details.");
+            }
+        });
+
+        deleteButton.addEventListener('click', async () => {
+            if (!savedDocId) {
+                showError("No data to delete.");
+                return;
+            }
+
+            setLoading(true);
+            showStatus('Deleting data...');
+
+            try {
+                const docRef = doc(db, `artifacts/${appId}/users/${userId}/resumes/${savedDocId}`);
+                await deleteDoc(docRef);
+                
+                setLoading(false);
+                showStatus('Data deleted successfully!');
+                skillsOutput.value = '';
+                projectsOutput.value = '';
+                saveButton.classList.add('hidden');
+                deleteButton.classList.add('hidden');
+                savedDocId = null;
+            } catch (e) {
+                console.error("Error deleting document: ", e);
+                setLoading(false);
+                showError("Failed to delete data. Check the console for more details.");
+            }
+        });
+
+        // Load PDF.js script dynamically
+        const pdfScript = document.createElement('script');
+        pdfScript.src = PDFJS_URL;
+        pdfScript.onload = () => {
+            console.log('PDF.js loaded successfully.');
+            // Set up the worker after the library is loaded
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+        };
+        document.head.appendChild(pdfScript);
+
+    </script>
+</body>
+</html>
